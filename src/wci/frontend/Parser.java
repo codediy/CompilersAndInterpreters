@@ -2,17 +2,19 @@ package wci.frontend;
 
 import wci.intermediate.ICode;
 import wci.intermediate.SymTab;
+import wci.intermediate.SymTabFactory;
+import wci.intermediate.SymTabStack;
 import wci.message.Message;
 import wci.message.MessageHandler;
 import wci.message.MessageListener;
 import wci.message.MessageProducer;
 
 public abstract class Parser implements MessageProducer {
-    protected static SymTab symTab;
+    protected static SymTabStack symTabStack;
     protected static MessageHandler messageHandler;
 
     static {
-        symTab = null;
+        symTabStack = SymTabFactory.createSymTabStack();
         messageHandler = new MessageHandler();
     }
 
@@ -40,8 +42,8 @@ public abstract class Parser implements MessageProducer {
         return iCode;
     }
 
-    public SymTab getSymTab() {
-        return symTab;
+    public SymTabStack getSymTabStack() {
+        return symTabStack;
     }
 
     @Override

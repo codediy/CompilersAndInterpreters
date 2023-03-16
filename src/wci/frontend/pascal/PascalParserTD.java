@@ -2,6 +2,8 @@ package wci.frontend.pascal;
 
 import wci.frontend.*;
 import wci.frontend.pascal.tokens.PascalErrorToken;
+import wci.intermediate.SymTabEntry;
+import wci.intermediate.SymTabStack;
 import wci.message.Message;
 import wci.message.MessageType;
 
@@ -23,19 +25,37 @@ public class PascalParserTD extends Parser {
 
                 TokenType tokenType = token.getType();
 
-                if (tokenType != PascalTokenType.ERROR) {
-                    sendMessage(new Message(MessageType.TOKEN,
-                            new Object[]{
-                                    token.getLineNum(),
-                                    token.getPosition(),
-                                    tokenType,
-                                    token.getText(),
-                                    token.getValue()
-                            }));
-                } else {
+
+                //symTab
+                if (tokenType == PascalTokenType.IDENTIFIER) {
+                    String name = token.getText().toLowerCase();
+
+                    SymTabEntry entry = symTabStack.lookup(name);
+                    if (entry == null) {
+                        entry = symTabStack.enterLocal(name);
+                    }
+
+                    entry.appendLineNumber(token.getLineNum());
+
+                } else if (tokenType == PascalTokenType.ERROR) {
                     errorHandler.flag(token, (PascalErrorCode) token.getValue(),
                             this);
                 }
+
+                //scanner
+//                if (tokenType != PascalTokenType.ERROR) {
+//                    sendMessage(new Message(MessageType.TOKEN,
+//                            new Object[]{
+//                                    token.getLineNum(),
+//                                    token.getPosition(),
+//                                    tokenType,
+//                                    token.getText(),
+//                                    token.getValue()
+//                            }));
+//                } else {
+//                    errorHandler.flag(token, (PascalErrorCode) token.getValue(),
+//                            this);
+//                }
             }
 
 

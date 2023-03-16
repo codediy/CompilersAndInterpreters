@@ -7,9 +7,11 @@ import wci.frontend.TokenType;
 import wci.frontend.pascal.PascalTokenType;
 import wci.intermediate.ICode;
 import wci.intermediate.SymTab;
+import wci.intermediate.SymTabStack;
 import wci.message.Message;
 import wci.message.MessageListener;
 import wci.message.MessageType;
+import wci.util.CrossReferencer;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -18,7 +20,7 @@ public class Pascal {
     private Parser parser;
     private Source source;
     private ICode iCode;
-    private SymTab symTab;
+    private SymTabStack symTabStack;
     private Backend backend;
 
 
@@ -45,9 +47,15 @@ public class Pascal {
             source.close();
 
             iCode = parser.getICode();
-            symTab = parser.getSymTab();
+            symTabStack = parser.getSymTabStack();
 
-            backend.process(iCode, symTab);
+            //xref 符号表索引打印
+            if (xref) {
+                CrossReferencer crossReferencer = new CrossReferencer();
+                crossReferencer.print(symTabStack);
+            }
+
+            backend.process(iCode, symTabStack);
         } catch (Exception ex) {
             System.out.println("***** Internal translator error.****");
             ex.printStackTrace();
