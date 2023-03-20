@@ -30,6 +30,10 @@ public abstract class Parser implements MessageProducer {
 
     public abstract int getErrorCount();
 
+    public Scanner getScanner() {
+        return scanner;
+    }
+
     public Token currentToken() {
         return scanner.currentToken();
     }

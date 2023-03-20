@@ -12,6 +12,7 @@ import wci.message.Message;
 import wci.message.MessageListener;
 import wci.message.MessageType;
 import wci.util.CrossReferencer;
+import wci.util.ParseTreePrinter;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -46,16 +47,25 @@ public class Pascal {
             parser.parse();
             source.close();
 
-            iCode = parser.getICode();
-            symTabStack = parser.getSymTabStack();
+            if (parser.getErrorCount() == 0) {
+                iCode = parser.getICode();
+                symTabStack = parser.getSymTabStack();
 
-            //xref 符号表索引打印
-            if (xref) {
-                CrossReferencer crossReferencer = new CrossReferencer();
-                crossReferencer.print(symTabStack);
+                //xref 符号表索引打印
+                if (xref) {
+                    CrossReferencer crossReferencer = new CrossReferencer();
+                    crossReferencer.print(symTabStack);
+                }
+
+                // 中间代码
+                if (intermediate) {
+                    ParseTreePrinter treePrinter = new ParseTreePrinter(System.out);
+                    treePrinter.print(iCode);
+                }
+
+                backend.process(iCode, symTabStack);
             }
 
-            backend.process(iCode, symTabStack);
         } catch (Exception ex) {
             System.out.println("***** Internal translator error.****");
             ex.printStackTrace();

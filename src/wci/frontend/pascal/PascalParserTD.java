@@ -1,7 +1,10 @@
 package wci.frontend.pascal;
 
 import wci.frontend.*;
+import wci.frontend.pascal.parsers.StatementParser;
 import wci.frontend.pascal.tokens.PascalErrorToken;
+import wci.intermediate.ICodeFactory;
+import wci.intermediate.ICodeNode;
 import wci.intermediate.SymTabEntry;
 import wci.intermediate.SymTabStack;
 import wci.message.Message;
@@ -16,31 +19,20 @@ public class PascalParserTD extends Parser {
         super(scanner);
     }
 
+    public PascalParserTD(PascalParserTD parent) {
+        super(parent.getScanner());
+    }
+
     @Override
     public void parse() throws Exception {
         Token token;
         long startTime = System.currentTimeMillis();
+        iCode = ICodeFactory.createICode();
+
         try {
             while (!((token = nextToken()) instanceof EofToken)) {
 
                 TokenType tokenType = token.getType();
-
-
-                //symTab
-                if (tokenType == PascalTokenType.IDENTIFIER) {
-                    String name = token.getText().toLowerCase();
-
-                    SymTabEntry entry = symTabStack.lookup(name);
-                    if (entry == null) {
-                        entry = symTabStack.enterLocal(name);
-                    }
-
-                    entry.appendLineNumber(token.getLineNum());
-
-                } else if (tokenType == PascalTokenType.ERROR) {
-                    errorHandler.flag(token, (PascalErrorCode) token.getValue(),
-                            this);
-                }
 
                 //scanner
 //                if (tokenType != PascalTokenType.ERROR) {
@@ -56,6 +48,46 @@ public class PascalParserTD extends Parser {
 //                    errorHandler.flag(token, (PascalErrorCode) token.getValue(),
 //                            this);
 //                }
+
+                //symTab
+//                if (tokenType == PascalTokenType.IDENTIFIER) {
+//                    String name = token.getText().toLowerCase();
+//
+//                    SymTabEntry entry = symTabStack.lookup(name);
+//                    if (entry == null) {
+//                        entry = symTabStack.enterLocal(name);
+//                    }
+//
+//                    entry.appendLineNumber(token.getLineNum());
+//
+//                } else if (tokenType == PascalTokenType.ERROR) {
+//                    errorHandler.flag(token, (PascalErrorCode) token.getValue(),
+//                            this);
+//                }
+
+                ICodeNode rootNode = null;
+                if (token.getType() == PascalTokenType.BEGIN) {
+                    StatementParser statementParser = new StatementParser(this);
+                    rootNode = statementParser.parse(token);
+                    token = currentToken();
+                } else {
+                    errorHandler.flag(
+                            token,
+                            PascalErrorCode.UNEXPECTED_TOKEN,
+                            this
+                    );
+                }
+
+                if (token.getType() != PascalTokenType.DOT) {
+                    errorHandler.flag(token,
+                            PascalErrorCode.MISSING_PERIOD,
+                            this);
+                }
+
+                token = currentToken();
+                if (rootNode != null) {
+                    iCode.setRoot(rootNode);
+                }
             }
 
 
@@ -81,4 +113,5 @@ public class PascalParserTD extends Parser {
     public int getErrorCount() {
         return errorHandler.getErrorCount();
     }
+
 }
