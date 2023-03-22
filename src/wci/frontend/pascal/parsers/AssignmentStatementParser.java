@@ -10,9 +10,21 @@ import wci.intermediate.SymTabEntry;
 import wci.intermediate.icodeimpl.ICodeKeyImpl;
 import wci.intermediate.icodeimpl.ICodeNodeTypeImpl;
 
+import java.util.EnumSet;
+
+import static wci.frontend.pascal.PascalTokenType.*;
+
 public class AssignmentStatementParser extends StatementParser {
     public AssignmentStatementParser(PascalParserTD parent) {
         super(parent);
+    }
+
+    private static final EnumSet<PascalTokenType> COLON_EQUALS_SET =
+            ExpressionParser.EXPR_START_SET.clone();
+
+    static {
+        COLON_EQUALS_SET.add(COLON_EQUALS);
+        COLON_EQUALS_SET.addAll(StatementParser.STMT_FOLLOW_SET);
     }
 
     public ICodeNode parse(Token token) throws Exception {
@@ -36,7 +48,12 @@ public class AssignmentStatementParser extends StatementParser {
 
         // :=
         token = nextToken();
-        if (token.getType() == PascalTokenType.COLON_EQUALS) {
+
+        // 预测等于号
+        token = synchronize(COLON_EQUALS_SET);
+
+
+        if (token.getType() == COLON_EQUALS) {
             token = nextToken();
         } else {
             errorHandler.flag(token, PascalErrorCode.MISSING_COLON_EQUALS, this);

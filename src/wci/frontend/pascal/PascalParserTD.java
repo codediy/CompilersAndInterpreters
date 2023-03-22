@@ -11,6 +11,7 @@ import wci.message.Message;
 import wci.message.MessageType;
 
 import java.io.IOException;
+import java.util.EnumSet;
 
 public class PascalParserTD extends Parser {
     protected static PascalErrorHandler errorHandler = new PascalErrorHandler();
@@ -112,6 +113,22 @@ public class PascalParserTD extends Parser {
     @Override
     public int getErrorCount() {
         return errorHandler.getErrorCount();
+    }
+
+
+    public Token synchronize(EnumSet syncSet) throws Exception {
+        Token token = currentToken();
+        if (!syncSet.contains(token.getType())) {
+            errorHandler.flag(
+                    token,
+                    PascalErrorCode.UNEXPECTED_TOKEN,
+                    this
+            );
+            do {
+                token = nextToken();
+            } while (!(token instanceof EofToken) && !syncSet.contains(token.getType()));
+        }
+        return token;
     }
 
 }

@@ -23,6 +23,11 @@ public class ExpressionParser extends StatementParser {
         super(parent);
     }
 
+    //表达式重启Token类型
+    static final EnumSet<PascalTokenType> EXPR_START_SET =
+            EnumSet.of(PLUS, MINUS, IDENTIFIER, INTEGER, REAL, STRING,
+                    PascalTokenType.NOT, LEFT_PAREN);
+
     public ICodeNode parse(Token token) throws Exception {
         return parseExpression(token);
     }
