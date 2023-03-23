@@ -39,7 +39,8 @@ public class StatementParser extends PascalParserTD {
                 statementNode = assignmentStatementParser.parse(token);
                 break;
             }
-            // control
+
+            // ch7 control parse
             case REPEAT: {
                 RepeatStatementParser repeatStatementParser =
                         new RepeatStatementParser(this);

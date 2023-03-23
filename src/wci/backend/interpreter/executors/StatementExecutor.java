@@ -31,6 +31,22 @@ public class StatementExecutor extends Executor {
                 AssignmentExecutor assignmentExecutor = new AssignmentExecutor(this);
                 return assignmentExecutor.execute(node);
             }
+
+            // 控制语句执行
+            case LOOP: {
+                LoopExecutor loopExecutor = new LoopExecutor(this);
+                return loopExecutor.execute(node);
+            }
+
+            case IF: {
+                IfExecutor ifExecutor = new IfExecutor(this);
+                return ifExecutor.execute(node);
+            }
+            case SELECT: {
+                SelectExecutor selectExecutor = new SelectExecutor(this);
+                return selectExecutor.execute(node);
+            }
+
             case NO_OP: {
                 return null;
             }
