@@ -37,6 +37,10 @@ public class Token {
         return lineNum;
     }
 
+    public int getLineNumber() {
+        return lineNum;
+    }
+
     public int getPosition() {
         return position;
     }

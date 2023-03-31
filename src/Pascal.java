@@ -7,7 +7,9 @@ import wci.frontend.TokenType;
 import wci.frontend.pascal.PascalTokenType;
 import wci.intermediate.ICode;
 import wci.intermediate.SymTab;
+import wci.intermediate.SymTabEntry;
 import wci.intermediate.SymTabStack;
+import wci.intermediate.symtabimpl.SymTabKeyImpl;
 import wci.message.Message;
 import wci.message.MessageListener;
 import wci.message.MessageType;
@@ -48,10 +50,18 @@ public class Pascal {
             source.close();
 
             if (parser.getErrorCount() == 0) {
-                iCode = parser.getICode();
+//                iCode = parser.getICode();
+//                symTabStack = parser.getSymTabStack();
+//
+//                //xref 符号表索引打印
+//                if (xref) {
+//                    CrossReferencer crossReferencer = new CrossReferencer();
+//                    crossReferencer.print(symTabStack);
+//                }
                 symTabStack = parser.getSymTabStack();
+                SymTabEntry programId = symTabStack.getProgramId();
+                iCode = (ICode) programId.getAttribute(SymTabKeyImpl.ROUTINE_ICODE);
 
-                //xref 符号表索引打印
                 if (xref) {
                     CrossReferencer crossReferencer = new CrossReferencer();
                     crossReferencer.print(symTabStack);

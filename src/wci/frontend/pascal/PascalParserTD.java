@@ -1,12 +1,13 @@
 package wci.frontend.pascal;
 
 import wci.frontend.*;
+import wci.frontend.pascal.parsers.BlockParser;
 import wci.frontend.pascal.parsers.StatementParser;
 import wci.frontend.pascal.tokens.PascalErrorToken;
-import wci.intermediate.ICodeFactory;
-import wci.intermediate.ICodeNode;
-import wci.intermediate.SymTabEntry;
-import wci.intermediate.SymTabStack;
+import wci.intermediate.*;
+import wci.intermediate.symtabimpl.DefinitionImpl;
+import wci.intermediate.symtabimpl.Predefined;
+import wci.intermediate.symtabimpl.SymTabKeyImpl;
 import wci.message.Message;
 import wci.message.MessageType;
 
@@ -16,6 +17,9 @@ import java.util.EnumSet;
 public class PascalParserTD extends Parser {
     protected static PascalErrorHandler errorHandler = new PascalErrorHandler();
 
+    private SymTabEntry routineId;
+
+
     public PascalParserTD(Scanner scanner) {
         super(scanner);
     }
@@ -24,18 +28,35 @@ public class PascalParserTD extends Parser {
         super(parent.getScanner());
     }
 
+    public SymTabEntry getRoutineId() {
+        return routineId;
+    }
+
     @Override
     public void parse() throws Exception {
         Token token;
         long startTime = System.currentTimeMillis();
+
         iCode = ICodeFactory.createICode();
 
+        //初始化 默认符号
+        Predefined.initialize(symTabStack);
+
+        routineId = symTabStack.enterLocal("DummyProgramName".toLowerCase());
+        routineId.setDefinition(DefinitionImpl.PROGRAM);
+        symTabStack.setProgramId(routineId);
+
+        routineId.setAttribute(SymTabKeyImpl.ROUTINE_SYMTAB, symTabStack.push());
+        routineId.setAttribute(SymTabKeyImpl.ROUTINE_ICODE, iCode);
+
+        BlockParser blockParser = new BlockParser(this);
+
         try {
-            while (!((token = nextToken()) instanceof EofToken)) {
+//            while (!((token = nextToken()) instanceof EofToken)) {
+//
+//                TokenType tokenType = token.getType();
 
-                TokenType tokenType = token.getType();
-
-                //scanner
+            //scanner
 //                if (tokenType != PascalTokenType.ERROR) {
 //                    sendMessage(new Message(MessageType.TOKEN,
 //                            new Object[]{
@@ -50,7 +71,7 @@ public class PascalParserTD extends Parser {
 //                            this);
 //                }
 
-                //symTab
+            //symTab
 //                if (tokenType == PascalTokenType.IDENTIFIER) {
 //                    String name = token.getText().toLowerCase();
 //
@@ -66,31 +87,47 @@ public class PascalParserTD extends Parser {
 //                            this);
 //                }
 
-                ICodeNode rootNode = null;
-                if (token.getType() == PascalTokenType.BEGIN) {
-                    StatementParser statementParser = new StatementParser(this);
-                    rootNode = statementParser.parse(token);
-                    token = currentToken();
-                } else {
-                    errorHandler.flag(
-                            token,
-                            PascalErrorCode.UNEXPECTED_TOKEN,
-                            this
-                    );
-                }
+//                ICodeNode rootNode = null;
+//                if (token.getType() == PascalTokenType.BEGIN) {
+//                    StatementParser statementParser = new StatementParser(this);
+//                    rootNode = statementParser.parse(token);
+//                    token = currentToken();
+//                } else {
+//                    errorHandler.flag(
+//                            token,
+//                            PascalErrorCode.UNEXPECTED_TOKEN,
+//                            this
+//                    );
+//                }
+//
+//                if (token.getType() != PascalTokenType.DOT) {
+//                    errorHandler.flag(token,
+//                            PascalErrorCode.MISSING_PERIOD,
+//                            this);
+//                }
+//
+//                token = currentToken();
+//                if (rootNode != null) {
+//                    iCode.setRoot(rootNode);
+//                }
+//            }
+            //Program
+            token = nextToken();
 
-                if (token.getType() != PascalTokenType.DOT) {
-                    errorHandler.flag(token,
-                            PascalErrorCode.MISSING_PERIOD,
-                            this);
-                }
+            //Block解析开始
+            ICodeNode rootNode = blockParser.parse(token, routineId);
+            iCode.setRoot(rootNode);
+            symTabStack.pop();
 
-                token = currentToken();
-                if (rootNode != null) {
-                    iCode.setRoot(rootNode);
-                }
+            token = currentToken();
+            if (token.getType() != PascalTokenType.DOT) {
+                errorHandler.flag(
+                        token,
+                        PascalErrorCode.MISSING_PERIOD,
+                        this
+                );
             }
-
+            token = currentToken();
 
             float elapsedTime = (System.currentTimeMillis() - startTime) / 1000f;
             sendMessage(

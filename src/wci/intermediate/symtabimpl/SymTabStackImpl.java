@@ -10,10 +10,21 @@ import java.util.ArrayList;
 public class SymTabStackImpl extends ArrayList<SymTab> implements SymTabStack {
 
     private int currentNestingLevel;
+    private SymTabEntry programId;
 
     public SymTabStackImpl() {
         this.currentNestingLevel = 0;
         add(SymTabFactory.createSymTab(currentNestingLevel));
+    }
+
+    @Override
+    public void setProgramId(SymTabEntry programId) {
+        this.programId = programId;
+    }
+
+    @Override
+    public SymTabEntry getProgramId() {
+        return programId;
     }
 
     @Override
@@ -27,6 +38,29 @@ public class SymTabStackImpl extends ArrayList<SymTab> implements SymTabStack {
     }
 
     @Override
+    public SymTab push() {
+        currentNestingLevel = currentNestingLevel + 1;
+        SymTab symTab = SymTabFactory.createSymTab(currentNestingLevel);
+        add(symTab);
+        return symTab;
+    }
+
+    @Override
+    public SymTab push(SymTab symTab) {
+        currentNestingLevel = currentNestingLevel + 1;
+        add(symTab);
+        return symTab;
+    }
+
+    public SymTab pop() {
+        SymTab symTab = get(currentNestingLevel);
+        remove(currentNestingLevel);
+        currentNestingLevel = currentNestingLevel - 1;
+        return symTab;
+    }
+
+
+    @Override
     public SymTabEntry enterLocal(String name) {
         return get(currentNestingLevel).enter(name);
     }
@@ -38,6 +72,11 @@ public class SymTabStackImpl extends ArrayList<SymTab> implements SymTabStack {
 
     @Override
     public SymTabEntry lookup(String name) {
-        return lookupLocal(name);
+        SymTabEntry foundEntry = null;
+        for (int i = currentNestingLevel; (i >= 0) && (foundEntry == null); i = i - 1) {
+            foundEntry = get(i).lookup(name);
+        }
+
+        return foundEntry;
     }
 }
