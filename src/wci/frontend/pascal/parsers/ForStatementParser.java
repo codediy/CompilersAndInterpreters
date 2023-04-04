@@ -7,8 +7,13 @@ import wci.frontend.pascal.PascalParserTD;
 import wci.frontend.pascal.PascalTokenType;
 import wci.intermediate.ICodeFactory;
 import wci.intermediate.ICodeNode;
+import wci.intermediate.TypeForm;
+import wci.intermediate.TypeSpec;
 import wci.intermediate.icodeimpl.ICodeKeyImpl;
 import wci.intermediate.icodeimpl.ICodeNodeTypeImpl;
+import wci.intermediate.symtabimpl.Predefined;
+import wci.intermediate.typeimpl.TypeChecker;
+import wci.intermediate.typeimpl.TypeFormImpl;
 
 import java.util.EnumSet;
 
@@ -39,11 +44,12 @@ public class ForStatementParser extends StatementParser {
 
     /**
      * CompoundNode
-     *      InitAssignNode
-     *      LoopNode
-     *          TestNode
-     *          StatementList
-     *          NextAssignNode
+     * InitAssignNode
+     * LoopNode
+     * TestNode
+     * StatementList
+     * NextAssignNode
+     *
      * @param token
      * @return
      * @throws Exception
@@ -72,8 +78,19 @@ public class ForStatementParser extends StatementParser {
         AssignmentStatementParser assignmentStatementParser =
                 new AssignmentStatementParser(this);
         ICodeNode initAssignNode = assignmentStatementParser.parse(token);
+        TypeSpec controlType = initAssignNode != null
+                ? initAssignNode.getTypeSpec()
+                : Predefined.undefinedType;
 
         setLineNumber(initAssignNode, targetToken);
+        if (!TypeChecker.isInteger(controlType)
+                && (controlType.getForm() != TypeFormImpl.ENUMERATION)) {
+            errorHandler.flag(
+                    token,
+                    PascalErrorCode.INCOMPATIBLE_TYPES,
+                    this
+            );
+        }
         // init
         compoundNode.addChild(initAssignNode);
         // loop
@@ -98,12 +115,26 @@ public class ForStatementParser extends StatementParser {
         ICodeNode relOpNode = ICodeFactory.createICodeNode(
                 direction == TO ? GT : LT
         );
+        relOpNode.setTypeSpec(Predefined.booleanType);
 
         ICodeNode controlVarNode = initAssignNode.getChildren().get(0);
         relOpNode.addChild(controlVarNode.copy());
 
         ExpressionParser expressionParser = new ExpressionParser(this);
-        relOpNode.addChild(expressionParser.parse(token));
+        ICodeNode exprNode = expressionParser.parse(token);
+        relOpNode.addChild(exprNode);
+
+        TypeSpec exprType = exprNode != null
+                ? exprNode.getTypeSpec()
+                : Predefined.undefinedType;
+        if (!TypeChecker.areAssignmentCompatible(controlType, exprType)) {
+            errorHandler.flag(
+                    token,
+                    PascalErrorCode.INCOMPATIBLE_TYPES,
+                    this
+            );
+        }
+
 
         testNode.addChild(relOpNode);
         loopNode.addChild(testNode);

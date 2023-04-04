@@ -5,12 +5,13 @@ import wci.frontend.TokenType;
 import wci.frontend.pascal.PascalErrorCode;
 import wci.frontend.pascal.PascalParserTD;
 import wci.frontend.pascal.PascalTokenType;
-import wci.intermediate.ICodeFactory;
-import wci.intermediate.ICodeNode;
-import wci.intermediate.ICodeNodeType;
-import wci.intermediate.SymTabEntry;
+import wci.intermediate.*;
 import wci.intermediate.icodeimpl.ICodeKeyImpl;
 import wci.intermediate.icodeimpl.ICodeNodeTypeImpl;
+import wci.intermediate.symtabimpl.DefinitionImpl;
+import wci.intermediate.symtabimpl.Predefined;
+import wci.intermediate.symtabimpl.SymTabKeyImpl;
+import wci.intermediate.typeimpl.TypeChecker;
 
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -62,6 +63,9 @@ public class ExpressionParser extends StatementParser {
      */
     private ICodeNode parseExpression(Token token) throws Exception {
         ICodeNode rootNode = parseSimpleExpression(token);
+        TypeSpec resultType = rootNode != null
+                ? rootNode.getTypeSpec()
+                : Predefined.undefinedType;
 
         token = currentToken();
         TokenType tokenType = token.getType();
@@ -72,9 +76,31 @@ public class ExpressionParser extends StatementParser {
             opNode.addChild(rootNode);
 
             token = nextToken();
-            opNode.addChild(parseSimpleExpression(token));
+            ICodeNode simExprNode = parseSimpleExpression(token);
+            opNode.addChild(simExprNode);
 
             rootNode = opNode;
+
+            TypeSpec simExprType = simExprNode != null
+                    ? simExprNode.getTypeSpec()
+                    : Predefined.undefinedType;
+            if (TypeChecker.areComparisonCompatible(
+                    resultType,
+                    simExprType
+            )) {
+                resultType = Predefined.booleanType;
+            } else {
+                errorHandler.flag(
+                        token,
+                        PascalErrorCode.INCOMPATIBLE_TYPES,
+                        this
+                );
+                resultType = Predefined.undefinedType;
+            }
+        }
+
+        if (rootNode != null) {
+            rootNode.setTypeSpec(resultType);
         }
 
         return rootNode;
@@ -101,20 +127,34 @@ public class ExpressionParser extends StatementParser {
      * @throws Exception
      */
     private ICodeNode parseSimpleExpression(Token token) throws Exception {
+        Token signToken = null;
         TokenType signTye = null;
 
         //正负符号
         TokenType tokenType = token.getType();
         if ((tokenType == PLUS) || (tokenType == MINUS)) {
             signTye = tokenType;
+            signToken = token;
             token = nextToken();
         }
 
         ICodeNode rootNode = parseTerm(token);
+        TypeSpec resultType = rootNode != null
+                ? rootNode.getTypeSpec()
+                : Predefined.undefinedType;
+        //类型检查
+        if ((signTye != null) && (!TypeChecker.isIntegerOrReal(resultType))) {
+            errorHandler.flag(
+                    signToken,
+                    PascalErrorCode.INCOMPATIBLE_TYPES,
+                    this
+            );
+        }
 
         if (signTye == MINUS) {
             ICodeNode negateNode = ICodeFactory.createICodeNode(NEGATE);
             negateNode.addChild(rootNode);
+            negateNode.setTypeSpec(rootNode.getTypeSpec());
             rootNode = negateNode;
         }
 
@@ -122,16 +162,50 @@ public class ExpressionParser extends StatementParser {
         tokenType = token.getType();
 
         while (ADD_OPS.contains(tokenType)) {
-            ICodeNodeType nodeType = ADD_OPS_OPS_MAP.get(tokenType);
+            TokenType operator = tokenType;
+            ICodeNodeType nodeType = ADD_OPS_OPS_MAP.get(operator);
             ICodeNode opNode = ICodeFactory.createICodeNode(nodeType);
             opNode.addChild(rootNode);
 
             token = nextToken();
 
-            opNode.addChild(parseTerm(token));
+            ICodeNode termNode = parseTerm(token);
+            opNode.addChild(termNode);
+            TypeSpec termType = termNode != null
+                    ? termNode.getTypeSpec()
+                    : Predefined.undefinedType;
 
             rootNode = opNode;
-
+            switch ((PascalTokenType) operator) {
+                case PLUS:
+                case MINUS: {
+                    if (TypeChecker.areBothInteger(resultType, termType)) {
+                        resultType = Predefined.integerType;
+                    } else if (TypeChecker.isAtLeastOneReal(resultType, termType)) {
+                        resultType = Predefined.realType;
+                    } else {
+                        errorHandler.flag(
+                                token,
+                                PascalErrorCode.INCOMPATIBLE_TYPES,
+                                this
+                        );
+                    }
+                    break;
+                }
+                case OR: {
+                    if (TypeChecker.areBothBoolean(resultType, termType)) {
+                        resultType = Predefined.booleanType;
+                    } else {
+                        errorHandler.flag(
+                                token,
+                                PascalErrorCode.INCOMPATIBLE_TYPES,
+                                this
+                        );
+                    }
+                    break;
+                }
+            }
+            rootNode.setTypeSpec(resultType);
             token = currentToken();
             tokenType = token.getType();
         }
@@ -165,19 +239,84 @@ public class ExpressionParser extends StatementParser {
      */
     private ICodeNode parseTerm(Token token) throws Exception {
         ICodeNode rootNode = parseFactor(token);
+        TypeSpec resultType = rootNode != null
+                ? rootNode.getTypeSpec()
+                : Predefined.undefinedType;
+
 
         token = currentToken();
         TokenType tokenType = token.getType();
 
         while (MULT_OPS.contains(tokenType)) {
-            ICodeNodeType nodeType = MULT_OPS_OPS_MAP.get(tokenType);
+            TokenType operator = tokenType;
+            ICodeNodeType nodeType = MULT_OPS_OPS_MAP.get(operator);
             ICodeNode opNode = ICodeFactory.createICodeNode(nodeType);
             opNode.addChild(rootNode);
 
             token = nextToken();
-            opNode.addChild(parseFactor(token));
+            ICodeNode factorNode = parseFactor(token);
+            opNode.addChild(factorNode);
+
+            TypeSpec factorType = factorNode != null
+                    ? factorNode.getTypeSpec()
+                    : Predefined.undefinedType;
 
             rootNode = opNode;
+            switch ((PascalTokenType) operator) {
+                case STAR: {
+                    if (TypeChecker.areBothInteger(resultType, factorType)) {
+                        resultType = Predefined.integerType;
+                    } else if (TypeChecker.isAtLeastOneReal(resultType, factorType)) {
+                        resultType = Predefined.realType;
+                    } else {
+                        errorHandler.flag(
+                                token,
+                                PascalErrorCode.INCOMPATIBLE_TYPES,
+                                this
+                        );
+                    }
+                    break;
+                }
+                case SLASH: {
+                    if (TypeChecker.areBothInteger(resultType, factorType)
+                            || TypeChecker.isAtLeastOneReal(resultType, factorType)) {
+                        resultType = Predefined.realType;
+                    } else {
+                        errorHandler.flag(
+                                token,
+                                PascalErrorCode.INCOMPATIBLE_TYPES,
+                                this
+                        );
+                    }
+                    break;
+                }
+                case DIV:
+                case MOD: {
+                    if (TypeChecker.areBothInteger(resultType, factorType)) {
+                        resultType = Predefined.integerType;
+                    } else {
+                        errorHandler.flag(
+                                token,
+                                PascalErrorCode.INCOMPATIBLE_TYPES,
+                                this
+                        );
+                    }
+                    break;
+                }
+                case AND: {
+                    if (TypeChecker.areBothBoolean(resultType, factorType)) {
+                        resultType = Predefined.booleanType;
+                    } else {
+                        errorHandler.flag(
+                                token,
+                                PascalErrorCode.INCOMPATIBLE_TYPES,
+                                this
+                        );
+                    }
+                    break;
+                }
+            }
+            rootNode.setTypeSpec(resultType);
 
             token = currentToken();
             tokenType = token.getType();
@@ -192,29 +331,30 @@ public class ExpressionParser extends StatementParser {
 
         switch ((PascalTokenType) tokenType) {
             case IDENTIFIER: {
-                String name = token.getText().toLowerCase();
-                SymTabEntry id = symTabStack.lookup(name);
-                if (id == null) {
-                    errorHandler.flag(
-                            token,
-                            PascalErrorCode.IDENTIFIER_UNDEFINED,
-                            this
-                    );
-                    id = symTabStack.enterLocal(name);
-                }
-
-                rootNode = ICodeFactory.createICodeNode(VARIABLE);
-                rootNode.setAttribute(ICodeKeyImpl.ID, id);
-
-                id.appendLineNumber(token.getLineNum());
-                token = nextToken();
-                break;
+//                String name = token.getText().toLowerCase();
+//                SymTabEntry id = symTabStack.lookup(name);
+//                if (id == null) {
+//                    errorHandler.flag(
+//                            token,
+//                            PascalErrorCode.IDENTIFIER_UNDEFINED,
+//                            this
+//                    );
+//                    id = symTabStack.enterLocal(name);
+//                }
+//
+//                rootNode = ICodeFactory.createICodeNode(VARIABLE);
+//                rootNode.setAttribute(ICodeKeyImpl.ID, id);
+//
+//                id.appendLineNumber(token.getLineNum());
+//                token = nextToken();
+                return parseIdentifier(token);
             }
             case INTEGER: {
                 rootNode = ICodeFactory.createICodeNode(INTEGER_CONSTANT);
                 rootNode.setAttribute(ICodeKeyImpl.VALUE, token.getValue());
 
                 token = nextToken();
+                rootNode.setTypeSpec(Predefined.integerType);
                 break;
             }
             case REAL: {
@@ -222,6 +362,8 @@ public class ExpressionParser extends StatementParser {
                 rootNode.setAttribute(ICodeKeyImpl.VALUE, token.getValue());
 
                 token = nextToken();
+
+                rootNode.setTypeSpec(Predefined.realType);
                 break;
             }
             case STRING: {
@@ -230,7 +372,12 @@ public class ExpressionParser extends StatementParser {
                 rootNode = ICodeFactory.createICodeNode(STRING_CONSTANT);
                 rootNode.setAttribute(ICodeKeyImpl.VALUE, value);
 
+                TypeSpec resultType = value.length() == 1
+                        ? Predefined.charType
+                        : TypeFactory.createStringType(value);
+
                 token = nextToken();
+                rootNode.setTypeSpec(resultType);
                 break;
             }
             case NOT: {
@@ -238,13 +385,30 @@ public class ExpressionParser extends StatementParser {
 
                 rootNode = ICodeFactory.createICodeNode(ICodeNodeTypeImpl.NOT);
 
-                rootNode.addChild(parseFactor(token));
+                ICodeNode factorNode = parseFactor(token);
+                rootNode.addChild(factorNode);
+
+                TypeSpec factorType = factorNode != null
+                        ? factorNode.getTypeSpec()
+                        : Predefined.undefinedType;
+                if (!TypeChecker.isBoolean(factorType)) {
+                    errorHandler.flag(
+                            token,
+                            PascalErrorCode.INCOMPATIBLE_TYPES,
+                            this
+                    );
+                }
+                rootNode.setTypeSpec(Predefined.booleanType);
                 break;
             }
             case LEFT_PAREN: {
                 token = nextToken();
 
                 rootNode = parseExpression(token);
+                TypeSpec resultType = rootNode != null
+                        ? rootNode.getTypeSpec()
+                        : Predefined.undefinedType;
+
 
                 token = currentToken();
                 if (token.getType() == RIGHT_PAREN) {
@@ -256,6 +420,7 @@ public class ExpressionParser extends StatementParser {
                             this
                     );
                 }
+                rootNode.setTypeSpec(resultType);
                 break;
             }
             default: {
@@ -264,6 +429,71 @@ public class ExpressionParser extends StatementParser {
                         PascalErrorCode.UNEXPECTED_TOKEN,
                         this
                 );
+                break;
+            }
+        }
+        return rootNode;
+    }
+
+    private ICodeNode parseIdentifier(Token token) throws Exception {
+        ICodeNode rootNode = null;
+
+        String name = token.getText().toLowerCase();
+        SymTabEntry id = symTabStack.lookup(name);
+
+        if (id == null) {
+            errorHandler.flag(
+                    token,
+                    PascalErrorCode.IDENTIFIER_UNDEFINED,
+                    this
+            );
+            id = symTabStack.enterLocal(name);
+            id.setDefinition(DefinitionImpl.UNDEFINED);
+            id.setTypeSpec(Predefined.undefinedType);
+        }
+
+        Definition defnCode = id.getDefinition();
+        switch ((DefinitionImpl) defnCode) {
+            case CONSTANT: {
+                Object value = id.getAttribute(SymTabKeyImpl.CONSTANT_VALUE);
+                TypeSpec type = id.getTypeSpec();
+
+                if (value instanceof Integer) {
+                    rootNode = ICodeFactory.createICodeNode(INTEGER_CONSTANT);
+                    rootNode.setAttribute(ICodeKeyImpl.VALUE, value);
+                } else if (value instanceof Float) {
+                    rootNode = ICodeFactory.createICodeNode(REAL_CONSTANT);
+                    rootNode.setAttribute(ICodeKeyImpl.VALUE, value);
+                } else if (value instanceof String) {
+                    rootNode = ICodeFactory.createICodeNode(STRING_CONSTANT);
+                    rootNode.setAttribute(ICodeKeyImpl.VALUE, value);
+                }
+
+                id.appendLineNumber(token.getLineNumber());
+                token = nextToken();
+
+                if (rootNode != null) {
+                    rootNode.setTypeSpec(type);
+                }
+                break;
+            }
+            case ENUMERATION_CONSTANT: {
+                Object value = id.getAttribute(SymTabKeyImpl.CONSTANT_VALUE);
+                TypeSpec type = id.getTypeSpec();
+
+                rootNode = ICodeFactory.createICodeNode(INTEGER_CONSTANT);
+                rootNode.setAttribute(ICodeKeyImpl.VALUE, value);
+
+                id.appendLineNumber(token.getLineNumber());
+                token = nextToken();
+
+                rootNode.setTypeSpec(type);
+                break;
+            }
+
+            default: {
+                VariableParser variableParser = new VariableParser(this);
+                rootNode = variableParser.parse(token, id);
                 break;
             }
         }

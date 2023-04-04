@@ -6,8 +6,11 @@ import wci.frontend.pascal.PascalParserTD;
 import wci.frontend.pascal.PascalTokenType;
 import wci.intermediate.ICodeFactory;
 import wci.intermediate.ICodeNode;
+import wci.intermediate.TypeSpec;
 import wci.intermediate.icodeimpl.ICodeKeyImpl;
 import wci.intermediate.icodeimpl.ICodeNodeTypeImpl;
+import wci.intermediate.symtabimpl.Predefined;
+import wci.intermediate.typeimpl.TypeChecker;
 
 import java.util.EnumSet;
 
@@ -44,7 +47,19 @@ public class WhileStatementParser extends StatementParser {
 
         // expression
         ExpressionParser expressionParser = new ExpressionParser(this);
-        notNode.addChild(expressionParser.parse(token));
+        ICodeNode exprNode = expressionParser.parse(token);
+        notNode.addChild(exprNode);
+
+        TypeSpec exprType = exprNode != null
+                ? exprNode.getTypeSpec()
+                : Predefined.undefinedType;
+        if (!TypeChecker.isBoolean(exprType)) {
+            errorHandler.flag(
+                    token,
+                    PascalErrorCode.INCOMPATIBLE_TYPES,
+                    this
+            );
+        }
 
         // do
         token = synchronize(DO_SET);

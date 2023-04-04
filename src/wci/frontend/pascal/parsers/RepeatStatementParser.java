@@ -6,8 +6,11 @@ import wci.frontend.pascal.PascalParserTD;
 import wci.frontend.pascal.PascalTokenType;
 import wci.intermediate.ICodeFactory;
 import wci.intermediate.ICodeNode;
+import wci.intermediate.TypeSpec;
 import wci.intermediate.icodeimpl.ICodeKeyImpl;
 import wci.intermediate.icodeimpl.ICodeNodeTypeImpl;
+import wci.intermediate.symtabimpl.Predefined;
+import wci.intermediate.typeimpl.TypeChecker;
 
 public class RepeatStatementParser extends StatementParser {
     public RepeatStatementParser(PascalParserTD parent) {
@@ -37,9 +40,21 @@ public class RepeatStatementParser extends StatementParser {
 
         //expression
         ExpressionParser expressionParser = new ExpressionParser(this);
-        testNode.addChild(expressionParser.parse(token));
+        ICodeNode exprNode = expressionParser.parse(token);
+
+        testNode.addChild(exprNode);
         loopNode.addChild(testNode);
 
+        TypeSpec exprType = exprNode != null
+                ? exprNode.getTypeSpec()
+                : Predefined.undefinedType;
+        if (!TypeChecker.isBoolean(exprType)) {
+            errorHandler.flag(
+                    token,
+                    PascalErrorCode.INCOMPATIBLE_TYPES,
+                    this
+            );
+        }
         return loopNode;
     }
 }

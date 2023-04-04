@@ -12,3 +12,4 @@
 - [ch7 控制语句解析 Parse Control]()
 - [ch8 控制语句执行 Executor Control]()
 - [ch9 声明解析 Parse Declarations]()
+- [ch10 类型检查 Type Checking]()
